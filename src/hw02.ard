@@ -1,5 +1,7 @@
-\import lect02 \hiding (+,*)
-\open Nat \hiding (-,div) -- Здесь лежат + и *.
+\import lect02 \hiding (+, *)
+\open Nat \using (- \as minus) \hiding (div)
+
+-- Здесь лежат + и *.
 
 -- I. Задания на рекурсивные определения.
 
@@ -10,22 +12,106 @@
    if False _ e = e
 -}
 
+\func if {A : \Type} (b : Bool) (t e : A) : A \elim b
+  | true => t
+  | false => e
+
 -- 2. Определите || через if.
 
-\func \infixr 2 || (x y : Bool) : Bool => {?}
+\func \infixr 2 || (x y : Bool) : Bool => if x true y
 
 -- 3. Определите возведение в степень и факториал для натуральных чисел.
 
-\func \infixr 8 ^ (x y : Nat) => {?}
+\func \infixr 8 ^ (x y : Nat) : Nat \elim y
+  | 0 => 1
+  | suc y => x * x ^ y
 
-\func fac (x : Nat) => {?}
+\func ^test1 : 12 ^ 0 = 1 => idp
+\func ^test2 : 2 ^ 10 = 1024 => idp
+
+\func fac (x : Nat) : Nat \elim x
+  | 0 => 1
+  | suc x => fac x * suc x
+
+\func facTest1 : fac 0 = 1 => idp
+\func facTest2 : fac 4 = 24 => idp
 
 -- 4. Определите mod и gcd.
 
-\func mod (x y : Nat) => {?}
+\func mod (x y : Nat) => mod' y x y
+  \where
+    \func mod' (s x y : Nat) : Nat \elim s
+      | 0 => 0
+      | suc s => if (x < y) x (mod' s (x - y) y)
 
-\func gcd (x y : Nat) => {?}
+\func modTest1 : mod 10 1 = 0 => idp
+\func modTest2 : mod 2 0 = 0 => idp
+\func modTest3 : mod 11 11 = 0 => idp
+\func modTest4 : mod 25 7 = 4 => idp
+\func modTest5 : mod 160 8 = 0 => idp
+
+\func gcd (x y : Nat) => if (x < y) (gcd' x x y) (gcd' y y x)
+  \where
+    \func gcd' (s x y : Nat) : Nat \elim s, x
+      | 0, _ => 0
+      | _, 0 => y
+      | suc s, x => gcd' s (mod y x) x
+
+\func gcdTest1 : gcd 0 0 = 0 => idp
+\func gcdTest2 : gcd 4 4 = 4 => idp
+\func gcdTest3 : gcd 15 5 = 5 => idp
+\func gcdTest4 : gcd 5 15 = 5 => idp
+\func gcdTest5 : gcd 14 21 = 7 => idp
+\func gcdTest6 : gcd 17 6 = 1 => idp
 
 -- 5. Определите (полиморфный) reverse для списков.
 
+\func reverse {A : \Type} (xs : List A) => reverse' nil xs
+  \where
+    \func reverse' {A : \Type} (acc xs : List A) : List A \elim xs
+      | nil => acc
+      | cons x xs => reverse' (cons x acc) xs
+
+\func reverseTest1 : reverse {Nat} nil = nil => idp
+\func reverseTest2 : reverse (cons 1 nil) = cons 1 nil => idp
+\func reverseTest3 : reverse (cons 1 (cons 2 (cons 3 nil))) = (cons 3 (cons 2 (cons 1 nil))) => idp
+
 -- 6. Реализуйте любой (but choose wisely) алгоритм сортировки. Функцию сравнения можно принимать в качестве аргумента.
+
+\func len {A : \Type} (xs : List A) : Nat
+  | nil => 0
+  | cons x xs => len xs + 1
+
+\func filter {A : \Type} (xs : List A) (cnd : A -> Bool) : List A \elim xs
+  | nil => nil
+  | cons x xs => if (cnd x) (cons x (filter xs cnd)) (filter xs cnd)
+
+\func sort {A : \Type} (xs : List A) (cmp : A -> A -> Int) => sort' ((len xs) ^ 2) xs cmp
+  \where
+    \func sort' {A : \Type} (s : Nat) (xs : List A) (cmp : A -> A -> Int) : List A \elim s, xs
+      | 0, _ => nil
+      | _, nil => nil
+      | suc s, cons x xs \as ys => (sort' s (filter xs (less cmp x)) cmp) ++ (filter ys (equal cmp x)) ++ (sort' s (filter xs (greater cmp x)) cmp)
+      \where {
+        \func less {A : \Type} (cmp : A -> A -> Int) (x y : A) : Bool => \case (cmp x y) \with {
+          | pos 0 => false
+          | pos (suc _) => true
+          | neg _ => false
+        }
+        \func greater {A : \Type} (cmp : A -> A -> Int) (x y : A) : Bool => \case (cmp x y) \with {
+          | neg 0 => false
+          | neg (suc _) => true
+          | pos _ => false
+        }
+        \func equal {A : \Type} (cmp : A -> A -> Int) (x y : A) : Bool => \case (cmp x y) \with {
+          | neg 0 => true
+          | pos 0 => true
+          | _ => false
+        }
+      }
+
+\func cmp (x y : Nat) : Int => minus x y
+
+\func sortTest1 : sort nil cmp = nil => idp
+\func sortTest2 : sort (cons 1 nil) cmp = (cons 1 nil) => idp
+\func sortTest3 : sort (cons 11 (cons 2 (cons 11 (cons 0 (cons 3 nil))))) cmp = (cons 0 (cons 2 (cons 3 (cons 11 (cons 11 nil))))) => idp
