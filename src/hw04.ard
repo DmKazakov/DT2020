@@ -14,7 +14,11 @@
 \data T (b : Bool) \with
   | true => tt
 
-\func lookup => {?}
+\func lookup {A : \Type} (xs : List A) (n : Nat) (p : T(n < length xs)) \elim xs, n
+  | nil, 0 => {?}
+  | nil, suc n => {?}
+  | cons y ys, 0 => y
+  | cons y ys, suc n => lookup ys n p
 
 -- 2. Реализуйте аналоги функции replicate для vec и Vec (эта функция создает список заданной длины, состоящий из повторений данного элемента).
 
