@@ -11,59 +11,178 @@
   | suc x, 0 => false
   | suc x, suc y => x < y
 
-\data T (b : Bool) \with
-  | true => tt
-
-\func lookup {A : \Type} (xs : List A) (n : Nat) (p : T(n < length xs)) \elim xs, n
-  | nil, 0 => {?}
-  | nil, suc n => {?}
+\func lookup {A : \Type} (xs : List A) (n : Nat) (p : T(n < length xs)) : A \elim xs, n
+  | nil, 0 => absurd p
+  | nil, suc n => absurd p
   | cons y ys, 0 => y
   | cons y ys, suc n => lookup ys n p
 
 -- 2. Реализуйте аналоги функции replicate для vec и Vec (эта функция создает список заданной длины, состоящий из повторений данного элемента).
 
+\func replicate {A : \Type} (x : A) (n : Nat) : vec A n \elim n
+  | 0 => ()
+  | suc n => (x, (replicate x n))
+
+\func replicateVec {A : \Type} (x : A) (n : Nat) : Vec A n \elim n
+  | 0 => vnil
+  | suc n => vcons x (replicateVec x n)
+
 -- 3. Реализуйте аналоги функции map для vec и Vec.
+
+\func map {A : \Type} {B : \Type} {n : Nat} (f : A -> B) (xs : vec A n) : vec B n \elim n, xs
+  | 0, () => ()
+  | suc n, (x, xs) => (f x, map f xs)
+
+\func mapVec {A : \Type} {B : \Type} {n : Nat} (f : A -> B) (xs : Vec A n) : Vec B n \elim n, xs
+  | 0, vnil => vnil
+  | suc n, vcons x xs => vcons (f x) (mapVec f xs)
 
 -- 4. Реализуйте аналоги функции zipWith для vec и Vec.
 --    Функция должна принимать вектора одинаковой длины.
+
+\func zipWith {A : \Type} {B : \Type} {C : \Type} {n : Nat} (f : A -> B -> C) (xs : vec A n) (ys : vec B n) : vec C n \elim n, xs, ys
+  | 0, (), () => ()
+  | suc n, (x, xs), (y, ys) => (f x y, zipWith f xs ys)
+
+\func zipWithVec {A : \Type} {B : \Type} {C : \Type} {n : Nat} (f : A -> B -> C) (xs : Vec A n) (ys : Vec B n) : Vec C n \elim n, xs, ys
+  | 0, vnil, vnil => vnil
+  | suc n, vcons x xs, vcons y ys => vcons (f x y) (zipWithVec f xs ys)
 
 -- 5. Функции Fin n → A соответствуют спискам элементов A длины n.
 --    Функция, преобразующая Vec A n в Fin n → A, была реализована на лекции.
 --    Реализуйте обратную функцию.
 
-\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n => {?}
+\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n \elim n
+  | 0 => vnil
+  | suc n => vcons (f fzero) (coin {A} {n} (\lam f' => f (fsuc f')))
 
 -- 6. Определите тип матриц и ряд функций над ними.
 
-\func Mat (A : \Type) (n m : Nat) : \Type => {?}
+\func Mat (A : \Type) (n m : Nat) : \Type => Vec (Vec A m) n
 
 -- диагональная матрица с элементами e на диагонали и z на остальных позициях.
 
-\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => {?}
+\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => diag' z e n n 0 \where {
+
+  \func diag' {A : \Type} (z e : A) (n k m : Nat) : Mat A k n \elim k
+    | 0 => vnil
+    | suc k => vcons (row z e n m) (diag' z e n k (suc m))
+
+  \func row {A : \Type} (z e : A) (n k : Nat) : Vec A n \elim n, k
+    | 0, _ => vnil
+    | suc n, 0 => vcons e (row z e n (suc n))
+    | suc n, suc k => vcons z (row z e n k)
+}
+
+\func testDiag1 : diag 0 1 0 = vnil => idp
+\func testDiag2 : diag 0 1 3 =
+  vcons (vcons 1 (vcons 0 (vcons 0 vnil))) (
+  vcons (vcons 0 (vcons 1 (vcons 0 vnil))) (
+  vcons (vcons 0 (vcons 0 (vcons 1 vnil))) vnil))
+  => idp
 
 -- транспонирование матриц
 
-\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n => {?}
+\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n \elim m
+  | 0 => vnil
+  | suc m => vcons (col M) (transpose (cut M))
+  \where {
+  \func cut {A : \Type} {n m : Nat} (M : Mat A n (suc m)) : Mat A n m \elim n, M
+    | 0, vnil => vnil
+    | suc n, vcons (vcons a r) M => vcons r (cut M)
+
+  \func col {A : \Type} {n m : Nat} (M : Mat A n (suc m)) : Vec A n \elim n, M
+    | 0, vnil => vnil
+    | suc n, vcons (vcons a r) M => vcons a (col M)
+}
+
+\func testTranspose1 : transpose (diag 0 1 0) = vnil => idp
+\func mat1 =>
+  vcons (vcons 1 (vcons 0 (vcons 0 vnil))) (
+  vcons (vcons 0 (vcons 1 (vcons 0 vnil))) vnil)
+\func testTranspose2 : transpose mat1 =
+  vcons (vcons 1 (vcons 0 vnil)) (
+  vcons (vcons 0 (vcons 1 vnil)) (
+  vcons (vcons 0 (vcons 0 vnil)) vnil))
+  => idp
 
 -- сложение матриц
 
-\func matAdd {A : \Type} (add : A -> A -> A) (n m : Nat) (M N : Mat A n m) : Mat A n m => {?}
+\func matAdd {A : \Type} {n m : Nat} (add : A -> A -> A) (M N : Mat A n m) : Mat A n m \elim n, M, N
+  | 0, vnil, vnil => vnil
+  | suc n, vcons rm M, vcons rn N => vcons (vecAdd add rm rn) (matAdd add M N)
+  \where
+    \func vecAdd  {A : \Type} {n : Nat} (add : A -> A -> A) (xs ys : Vec A n) : Vec A n \elim n, xs, ys
+      | 0, vnil, vnil => vnil
+      | suc n, vcons x xs, vcons y ys => vcons (add x y) (vecAdd add xs ys)
+
+\func testMatAdd1 : matAdd (Nat.+) (diag 0 1 0) (diag 0 1 0) = vnil => idp
+\func mat2 =>
+  vcons (vcons 0 (vcons 2 (vcons 3 vnil))) (
+  vcons (vcons 0 (vcons 1 (vcons 0 vnil))) vnil)
+\func testMatAdd2 : matAdd (Nat.+) mat1 mat2 =
+  vcons (vcons 1 (vcons 2 (vcons 3 vnil))) (
+  vcons (vcons 0 (vcons 2 (vcons 0 vnil))) vnil)
+  => idp
 
 -- умножение матриц
 
 -- z ─ нейтральный элемент по сложению.
-\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k => {?}
+\func matMul {A : \Type} {n m k : Nat} (z : A) (add mul : A -> A -> A) (M : Mat A n m) (N : Mat A m k) : Mat A n k \elim n, m, M
+  | _, 0, _ => initMat z
+  | 0, _, _ => vnil
+  | suc n, suc m, vcons r M => vcons (rowMatMul z add mul r N) (matMul z add mul M N)
+
+  \where {
+    \func initMat {A : \Type} {n m : Nat} (z : A) : Mat A n m \elim n
+      | 0 => vnil
+      | suc n => vcons (replicateVec z m) (initMat z)
+
+    \func rowMatMul {A : \Type} {n m : Nat} (z : A) (add mul : A -> A -> A) (xs : Vec A n) (M : Mat A n m) : Vec A m \elim m
+      | 0 => vnil
+      | suc m => vcons (dotProd z add mul xs (transpose.col M)) (rowMatMul z add mul xs (transpose.cut M))
+
+    \func dotProd {A : \Type} {n : Nat} (z : A) (add mul : A -> A -> A) (xs ys : Vec A n) => fold z add (zipWithVec mul xs ys)
+        \where
+          \func fold {A : \Type} {n : Nat} (acc : A) (f : A -> A -> A) (xs : Vec A n) : A \elim n, xs
+            | 0, vnil => acc
+            | suc n, vcons x xs => fold (f acc x) f xs
+  }
+
+\func testMatMul1 : matMul 0 (Nat.+) (Nat.*) vnil (vcons vnil vnil) = vnil => idp
+\func testMatMul2 : matMul 0 (Nat.+) (Nat.*) (vcons vnil (vcons vnil vnil)) vnil =
+  vcons (vcons 0 vnil) (
+  vcons (vcons 0 vnil) vnil) => idp
+\func mat3 =>
+  vcons (vcons 1 (vcons 2 vnil)) (
+  vcons (vcons 6 (vcons 1 vnil)) (
+  vcons (vcons 5 (vcons 4 vnil)) vnil))
+\func testMatMul3 : matMul 0 (Nat.+) (Nat.*) mat2 mat3 =
+  vcons (vcons 27 (vcons 14 vnil)) (
+  vcons (vcons 6  (vcons 1 vnil)) vnil) => idp
 
 -- 7. Определите тип CTree A n полных бинарных деревьев высоты ровно n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data CTree (A : \Type) (n : Nat)
+\data CTree (A : \Type) (n : Nat) \elim n
+  | 0 => cleaf
+  | suc n => cnode A (CTree A n) (CTree A n)
 
 -- 8. Определите тип Tree A n бинарных деревьев высоты не больше n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data Tree (A : \Type) (n : Nat)
+\data Tree (A : \Type) (n : Nat) \elim n
+  | _ => leaf
+  | suc n => node A (Tree A n) (Tree A n)
 
 -- определите функцию, возвращающую высоту дерева.
 
-\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) => {?}
+\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) \elim n, t
+  | _, leaf => fzero
+  | suc n, node _ l r => fsuc (max (height n l) (height n r))
+  \where
+    \func max {n : Nat} (x : Fin n) (y : Fin n) : Fin n => \case toNat x < toNat y \with {
+      | true => y
+      | false => x
+    }
+
