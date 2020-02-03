@@ -117,6 +117,8 @@
   | nil => n
   | cons x xs => c x xs (List-rec P n c xs)
 
+-- А элиминатор?
+
 -- 10. Докажите, что 0 не равно suc x.
 
 \func N (n : Nat) : \Type \elim n
