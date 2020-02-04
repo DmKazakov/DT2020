@@ -1,43 +1,173 @@
+\import Prelude
 \import Utils
-\import lect05 (+-comm)
-\import lect06 \hiding (<=-refl)
-\open Nat(+,*)
+\import hw05 (*-comm, dec, pmap2)
+\import lect05 (+-comm, funExt)
+\import lect06
+\open Nat (+, *)
 
 -- 1. Докажите, что vnil является нейтральным элементом для v++.
 
-\func vnil-rightId {A : \Type} {n : Nat} (xs : Vec A n) : transport (Vec A) (+-comm 0 n) (xs v++ vnil) = xs => {?}
+\func vnil-rightId {A : \Type} {n : Nat} (xs : Vec A n) : transport (Vec A) (+-comm 0 n) (xs v++ vnil) = xs \elim n, xs
+  | 0, vnil => idp
+  | suc n, vcons x xs => lem xs x (+-comm 0 n) *> pmap (vcons x) (vnil-rightId xs)
+  \where
+    \func lem {A : \Type} {n : Nat} (xs : Vec A n) (x : A) {a : Nat} (p : 0 + n = a)
+      : transport (Vec A) (pmap suc p) (vcons x (xs v++ vnil)) = vcons x (transport (Vec A) p (xs v++ vnil)) \elim p
+      | idp => idp
 
 -- 2. Определите предикат принадлежности элемента списку.
 
-\data In {A : \Type} (a : A) (xs : List A)
+\data In {A : \Type} (a : A) (xs : List A) \elim xs
+  | cons x xs => { head (x = a) | tail (In a xs) }
 
 -- 3. Докажите эквивалентность четырех различных определений LessOrEq: lessOrEq, lessOrEq', LessOrEq и LessOrEq'.
+
+\func sucOut (n m : Nat) : suc n + m = suc (n + m)
+  | _, 0 => idp
+  | n, suc m => pmap suc (sucOut n m)
+
+\func lessOrEq=>lessOrEq' (n m : Nat) (p : lessOrEq n m) : lessOrEq' n m \elim n, m, p
+  | 0, _, _ => ()
+  | suc n, 0, (u, w) => suc/=0 (sym (sucOut n u) *> w)
+  | suc n, suc m, (u, w) => lessOrEq=>lessOrEq' n m (u, pmap dec (transport (\lam z => z = suc m) (sucOut n u) w))
+
+\func lessOrEq'=>LessOrEq (n m : Nat) (p : lessOrEq' n m) : LessOrEq n m \elim n, m
+  | 0, _ => z<=n
+  | suc n, 0 => absurd p
+  | suc n, suc m => s<=s (lessOrEq'=>LessOrEq n m p)
+
+\func LessOrEq=>LessOrEq' (n m : Nat) (p : LessOrEq n m) : LessOrEq' n m \elim n, m, p
+  | 0, 0, _ => <=-refl idp
+  | 0, suc m, p => <=-step (LessOrEq=>LessOrEq' 0 m z<=n)
+  | suc n, suc m, s<=s l => h n m (LessOrEq=>LessOrEq' n m l)
+    \where \func h (n m : Nat) (p : LessOrEq' n m) : LessOrEq' (suc n) (suc m) \elim n, m, p
+      | 0, 0, <=-refl = => <=-refl idp
+      | 0, suc m, <=-step l => <=-step (h 0 m l)
+      | suc n, 0, <=-refl = => absurd (suc/=0 =)
+      | _, suc m, <=-refl = => <=-refl (pmap suc =)
+      | suc n, suc m, <=-step l => <=-step (h (suc n) m l)
+
+\func LessOrEq'=>lessOrEq (n m : Nat) (p : LessOrEq' n m) : lessOrEq n m \elim n, m, p
+  | 0, 0, <=-refl = => (0, idp)
+  | 0, suc m, <=-refl l => absurd (suc/=0 (sym l))
+  | 0, suc m, <=-step l => (suc m, pmap suc (+-comm 0 m))
+  | suc n, 0, <=-refl l => absurd (suc/=0 l)
+  | suc n, suc m, <=-refl l => (0, l)
+  | suc n, suc m, <=-step l => ((LessOrEq'=>lessOrEq n m (h n m l)).1,
+                                transport (\lam z => z = suc m) (sym (sucOut n (LessOrEq'=>lessOrEq n m (h n m l)).1))
+                                          (pmap suc (LessOrEq'=>lessOrEq n m (h n m l)).2))
+  \where \func h (n m : Nat) (p : LessOrEq' (suc n) m) : LessOrEq' n m \elim n, m, p
+    | _, 0, <=-refl = => absurd (suc/=0 =)
+    | 0, suc m, <=-step l => <=-step (h 0 m l)
+    | _, suc m, <=-refl = => <=-step (<=-refl (pmap dec =))
+    | suc n, suc m, <=-step l => <=-step (h (suc n) m l)
 
 -- 4. Определите рефлексивное транзитивное замыкание отношения.
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и транзитивное отношение, содержащее R.
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
+  | refl (x = y)
+  | tr (z : A) (R x z) (ReflTransClosure R z y)
 
 -- 5. Докажите, что если R уже рекфлексивно и транзитивно, то ReflTransClosure R эквивалентно R.
 
 \func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
-  : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y
-  => {?}
+  : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y => \lam x y => (
+  \lam r => tr y r (ReflTransClosure.refl (idp : y = y)),
+  \lam r => ReflTransClosure-lem' R refl trans x y r)
+  \where {
+    \func ReflTransClosure-lem' {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+                                (x y : A) (r : ReflTransClosure R x y) : R x y \elim r
+      | refl p => h R x y p refl
+      | tr z r' r* => trans x z y r' (ReflTransClosure-lem' R refl trans z y r*)
+
+    \func h {A : \Type} (R : A -> A -> \Type) (x y : A) (p : x = y) (refl : \Pi (x : A) -> R x x) : R x y \elim p
+      | idp => refl x
+  }
 
 -- 6. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
 
--- 7. Докажите, что Sublist (filter p xs) xs для любых p и xs.
+\data Sublist {A : \Type} (xs : List A) (ys : List A) \elim xs, ys
+  | nil, _ => lempty
+  | cons x xs, cons y ys => { eq (x = y) (Sublist xs ys) | subl (Sublist (cons x xs) ys) }
+
+-- 7. Докажите, что Sublist (filter xs) xs для любого списка xs.
+
+\func sublistFilter {A : \Type} (xs : List A) (p : A -> Bool) : Sublist (filter p xs) xs \elim xs
+  | nil => lempty
+  | cons x xs => \case p x \as b \return
+  Sublist (\case b \with {
+    | true => cons x (filter p xs)
+    | false => filter p xs
+  }) (cons x xs) \with {
+    | true => eq idp (sublistFilter xs p)
+    | false => h x (filter p xs) xs (sublistFilter xs p)
+  }
+  \where {
+    \func h {A : \Type} (y : A) (xs ys : List A) (p : Sublist xs ys) : Sublist xs (cons y ys) \elim xs, ys, p
+      | nil, _, Sublist.lempty => Sublist.lempty
+      | cons x xs, cons y' ys, p => subl p
+  }
 
 -- 8. Реализуйте любой алгоритм сортировки, используя \case для паттерн матчинга на результате сравнения элементов списка.
+
+\func \infixr 8 ^ (x y : Nat) : Nat \elim y
+  | 0 => 1
+  | suc y => x * x ^ y
+
+\func sort {A : \Type} (xs : List A) (cmp : A -> A -> Ordering) => sort' ((length xs) ^ 2) xs cmp
+  \where {
+    \func sort' {A : \Type} (s : Nat) (xs : List A) (cmp : A -> A -> Ordering) : List A \elim s, xs
+      | 0, _ => nil
+      | _, nil => nil
+      | suc s, cons x xs \as ys =>
+        (sort' s (filter (compare cmp GT x) xs) cmp) ++ (filter (compare cmp EQ x) ys) ++ (sort' s (filter (compare cmp LT x) xs) cmp)
+
+    \func compare {A : \Type} (cmp : A -> A -> Ordering) (ord : Ordering) (x y : A) : Bool =>
+      \case ord, (cmp x y) \with {
+        | LT, LT => true
+        | EQ, EQ => true
+        | GT, GT => true
+        | _, _ => false
+      }
+  }
+
+\func sortTest1 : sort nil compare = nil => idp
+
+\func sortTest2 : sort (cons 1 nil) compare = (cons 1 nil) => idp
+
+\func sortTest3 : sort (cons 11 (cons 2 (cons 11 (cons 0 (cons 3 nil))))) compare = (cons 0 (cons 2 (cons 3 (cons 11 (cons 11 nil))))) =>
+  idp
 
 -- 9. Определите filter через if, а не через \case.
 --    Докажите для этой версии filter лемму filter-lem.
 
-\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A => {?}
+\func if {A : \Type} (b : Bool) (t e : A) : A \elim b
+  | true => t
+  | false => e
 
-\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : length (filter' p xs) Nat.<= length xs => {?}
+\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+  | nil => nil
+  | cons x xs => if (p x) (cons x (filter' p xs)) (filter' p xs)
+
+\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : length (filter' p xs) Nat.<= length xs \elim xs
+  | nil => Nat.zero<=_
+  | cons x xs => \case p x \as b \return length (if b (cons x (filter' p xs)) (filter' p xs)) Nat.<= suc (length xs) \with {
+    | true => Nat.suc<=suc (filter-lem p xs)
+    | false => <=-helper (filter-lem p xs)
+  }
 
 -- 10. Закончите определение функции \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x из лекции.
+
+\func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x =>
+  \case \elim x, f true \as p, idp : f true = p, f false \as q, idp : f false = q \with {
+    | true, true, ft, _, _ => pmap (\lam x => f (f x)) ft *> pmap f ft
+    | true, false, ft, false, ff => pmap (\lam x => f (f x)) ft *> pmap (\lam x => f x) ff *> ff *> sym ft
+    | true, false, ft, true, ff => pmap (\lam x => f (f x)) ft *> pmap (\lam x => f x) ff
+    | false, true, ft, true, ff => pmap (\lam x => f (f x)) ff *> pmap f ft *> ft *> sym ff
+    | false, _, _, false, ff => pmap (\lam x => f (f x)) ff *> pmap f ff
+    | false, false, ft, true, ff => pmap (\lam x => f (f x)) ff *> pmap f ft *> ff *> sym ff
+  }
 
 -- 11. Парадокс Рассела показывает, что не существует множества всех множеств.
 -- Если такое множеств существует, то мы можем определить множество B, состоящее из множеств, не содержащих себя.
@@ -48,14 +178,22 @@
 -- Верно, что в общем случае существование такого утверждения влечет противоречие.
 -- Это легко доказать при помощи исключенного третьего, но утверждение верно и без него.
 -- Докажите этот факт.
-\func contrProp {A : \Type} (p : A -> Not A) (q : Not A -> A) : Empty
-  => {?}
+
+\func contrProp {A : \Type} (p : A -> Not A) (q : Not A -> A) : Empty => p (q (\lam x => p x x)) (q (\lam x => p x x))
 
 -- 12. Докажите, что предикат isEven разрешим.
 
 \func isEven (n : Nat) => \Sigma (k : Nat) (n = 2 * k)
 
-\func isEven-dec : DecPred isEven => {?}
+\func isEven-dec : DecPred isEven => \lam n => \case (parity n) \with {
+  | even k p => yes (k, p)
+  | odd k p => no (\lam q => h k q.1 (sym q.2 *> p))
+} \where
+  \func h (k k' : Nat) (p : 2 * k' = suc (2 * k)) : Empty \elim k, k'
+    | 0, 0 => suc/=0 (sym p)
+    | 0, suc k' => suc/=0 (pmap (\lam x => dec x) p)
+    | suc k, 0 => suc/=0 (sym p)
+    | suc k, suc k' => h k k' (pmap (\lam x => dec (dec x)) p)
 
 -- 13. Докажите, что если равенство элементов A разрешимо, то любой список элементов A либо пуст, либо состоит из повторений одного элемента, либо в A существует два различных элемента.
 
@@ -68,7 +206,16 @@
   | repeated (n : Nat) (a : A) (p : xs = repeat n a)
   | A-is-not-trivial (a a' : A) (p : a = a' -> Empty)
 
-\func lemma {A : \Type} (xs : List A) {dec : DecEq A} : Result A xs => {?}
+\func lemma {A : \Type} (xs : List A) {dec : DecEq A} : Result A xs \elim xs
+  | nil => empty idp
+  | cons x xs => \case (lemma xs {dec}) \with {
+    | empty p => repeated 1 x (pmap (\lam z => cons x z) p)
+    | repeated n a p => \case dec x a \with {
+      | yes q => repeated (n + 1) x (pmap (\lam z => cons x z) p *> pmap (\lam z => cons x (repeat n z)) (sym q))
+      | no q => A-is-not-trivial x a q
+    }
+    | A-is-not-trivial a a' p => A-is-not-trivial a a' p
+  }
 
 -- 14. Определите view, представляющий число в виде частного и остатка от деления его на произвольное (неотрицательное) число m.
 --    Реализуйте функцию деления.
@@ -76,17 +223,82 @@
 \data ModView (m n : Nat)
   | quot-rem (q r : Nat) (t : r < m) (p : n = q * m + r)
 
-\func mod-view (m n : Nat) (t : 0 < m) : ModView m n => {?}
+\func suc>0 {n : Nat} (p : (suc n) Nat.<= 0) : Empty
 
-\func div (n m : Nat) (t : 0 < m) : Nat => {?}
+\func zero=zero*Nat(n : Nat) : 0 = 0 * n
+  | 0 => idp
+  | suc n => zero=zero*Nat n
+
+\func decEqNat : DecEq Nat => \lam n m => h n m
+  \where
+    \func h (n m : Nat) : Decide (n = m)
+      | 0, 0 => yes idp
+      | 0, suc m => no (\lam p => suc/=0 (sym p))
+      | suc n, 0 => no (\lam p => suc/=0 p)
+      | suc n, suc m => \case (h n m) \with {
+        | yes p => yes (pmap suc p)
+        | no p => no (\lam z => p (pmap dec z))
+      }
+
+\func leqAndNeq=>le (n m : Nat) (p : n < m) (q : Not (suc n = m)) : suc n < m \elim n, m
+  | _, 0 => absurd (suc>0 p)
+  | 0, suc m => \case m \as k, idp : k = m \with {
+    | 0, t => absurd (q (pmap suc t))
+    | suc n', t => transport (\lam n => 1 < suc n) t (Nat.suc<=suc (Nat.suc<=suc Nat.zero<=_))
+  }
+  | suc n, suc m => \case p \with {
+    | Nat.suc<=suc u => Nat.suc<=suc (leqAndNeq=>le n m u (\lam z => q (pmap suc z)))
+  }
+
+\func mod-view (m n : Nat) (t : 0 < m) : ModView m n \elim m, n
+  | 0, suc n => absurd (suc>0 t)
+  | suc m, 0 => quot-rem 0 0 t (zero=zero*Nat m)
+  | suc m, suc n => \case (mod-view (suc m) n t) \with {
+    | quot-rem q' r' t' p' => \case (decEqNat (suc r') (suc m)) \with {
+      | yes u => quot-rem (suc q') 0 t (pmap suc (p' *> (
+        q' * m + q' + r'  ==< pmap (\lam z => q' * m + q' + z) (pmap dec u) >==
+        q' * m + q' + m   ==< sym (+-assoc (q' * m) q' m) >==
+        q' * m + (q' + m) ==< pmap (\lam z => q' * m + z) (+-comm q' m) >==
+        q' * m + (m + q') ==< +-assoc (q' * m) m q' >==
+        q' * m + m + q'   ==< pmap (\lam z => z + m + q') (*-comm q' m)) >==
+        m * q' + m + q'   ==< idp >==
+        m * (suc q') + q' ==< pmap (\lam z => z + q') (*-comm m (suc q')) >==
+        suc q' * m + q'   `qed
+      ))
+      | no u => quot-rem q' (suc r') (leqAndNeq=>le r' (suc m) t' u) (pmap suc p')
+    }
+  }
+
+\func div (n m : Nat) (t : 0 < m) : Nat => \case (mod-view m n t) \with {
+  | quot-rem q r t p => q
+}
 
 -- 15. Докажите, что функции FromBoolToDec и FromDecToBool взаимно обратны.
 
-\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p => {?}
+\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p => funExt (\lam _ => Bool) (
+  \lam a => \case (p a) \as b \return ((\case \case b \as b \return Decide (T b) \with {
+                                                    | true => yes ()
+                                                    | false => no absurd } \with {
+                                          | no _ => false
+                                          | yes _ => true }) = b) \with {
+    | true => idp
+    | false => idp
+  })
+
 
 -- Мы не можем доказать, что FromBoolToDec (FromDecToBool P) = P, но мы можем доказать более слабое утверждение: эти предикаты логически эквивалентны.
 -- Для этого введем эквивалентность предикатов.
 
 \func dbd {A : \Type} (P : \Sigma (P : A -> \Type) (DecPred P))
   : \Pi (x : A) -> (FromBoolToDec (FromDecToBool P)).1 x <-> P.1 x
-  => {?}
+  => \lam x => \case P.2 x \as b \return (\Sigma (T (\case b \with {
+                                                    | no _ => false
+                                                    | yes _ => true}) -> P.1 x)
+                                               (P.1 x ->
+                                               T (\case b \with {
+                                                    | no _ => false
+                                                    | yes _ => true}))) \with {
+    | yes a => (\lam _ => a, \lam _ => ())
+    | no q => (\lam z => absurd z, \lam z => q z)
+  }
+
