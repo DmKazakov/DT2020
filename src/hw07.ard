@@ -1,8 +1,8 @@
 \import Utils
 \import hw02 (gcd)
+\import hw06
 \import lect05 (funExt)
 \import lect06 (Decide, no, yes)
-\import lect07
 
 -- 1. Определите функцию swap несколькими способами.
 
@@ -199,7 +199,7 @@
 
 -- 10. Определите отношение многошаговой редукции на Term.
 
-\func Red {V : \Type} (t s : Term V) : \Type \elim t, s
+\func Red {V : \Type} (t s : Term V) : \Type => ReflTransClosure Red1 t s
 
 -- 11. Стратегия редукции -- это функция, которая каждому терму сопоставляет либо некоторый терм, к которому он редуцируется за 1 шаг, либо доказательство, что таких термов нет.
 --     Определите любую стратегию редукции.
@@ -282,9 +282,14 @@
 
 -- 12. Докажите следующую обобщенную лемму о подстановке и выведите из нее обычную версию: если Г, x : A |- b : B и Г |- a : A, то Г |- b[a/x] : B.
 
+\func getType {V : \Type} {ctx : V -> Type} {t : Term V} {T : Type} (h : hasType ctx t T) => T
+
 \func substLem {U V : \Type} (ctx : U -> Type) (b : Term U) (B : Type) (h : hasType ctx b B)
                (ctx' : V -> Type) (a : U -> Term V) (h' : \Pi (u : U) -> hasType ctx' (a u) (ctx u))
-  : hasType ctx' (b >>= a) B => {?}
+  : hasType ctx' (b >>= a) B \elim b, B, h
+  | var v, _, varType p => transport (\lam x => hasType ctx' (a v) x) p (h' v)
+  | app t1 t2, _, appType T2 T1 => appType (substLem ctx t2 (getType T2) T2 ctx' a h') (substLem ctx t1 (getType T1) T1 ctx' a h')
+  | lam t, Arr A B, lamType T => {?} -- lamType (substLem (maybe A ctx) t (getType T) T (maybe A ctx') (TermMonad.maybefy a) (maybe T h'))
 
 \func substLem1 => {?}
 

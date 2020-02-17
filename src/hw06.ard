@@ -88,25 +88,25 @@
 -- 6. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
 
 \data Sublist {A : \Type} (xs : List A) (ys : List A) \elim xs, ys
-  | nil, _ => lempty
-  | cons x xs, cons y ys => { eq (x = y) (Sublist xs ys) | subl (Sublist (cons x xs) ys) }
+  | nil, _ => sublist-empty
+  | cons x xs, cons y ys => { sublist-eq (x = y) (Sublist xs ys) | sublist-cons (Sublist (cons x xs) ys) }
 
 -- 7. Докажите, что Sublist (filter xs) xs для любого списка xs.
 
 \func sublistFilter {A : \Type} (xs : List A) (p : A -> Bool) : Sublist (filter p xs) xs \elim xs
-  | nil => lempty
+  | nil => sublist-empty
   | cons x xs => \case p x \as b \return
   Sublist (\case b \with {
     | true => cons x (filter p xs)
     | false => filter p xs
   }) (cons x xs) \with {
-    | true => eq idp (sublistFilter xs p)
+    | true => sublist-eq idp (sublistFilter xs p)
     | false => h x (filter p xs) xs (sublistFilter xs p)
   }
   \where {
     \func h {A : \Type} (y : A) (xs ys : List A) (p : Sublist xs ys) : Sublist xs (cons y ys) \elim xs, ys, p
-      | nil, _, Sublist.lempty => Sublist.lempty
-      | cons x xs, cons y' ys, p => subl p
+      | nil, _, Sublist.sublist-empty => Sublist.sublist-empty
+      | cons x xs, cons y' ys, p => sublist-cons p
   }
 
 -- 8. Реализуйте любой алгоритм сортировки, используя \case для паттерн матчинга на результате сравнения элементов списка.
