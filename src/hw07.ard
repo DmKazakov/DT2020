@@ -3,6 +3,7 @@
 \import hw06
 \import lect05 (funExt)
 \import lect06 (Decide, no, yes)
+\import lect07 \using (refl \as refl1)
 
 -- 1. Определите функцию swap несколькими способами.
 
@@ -132,12 +133,17 @@
 \func unstate' {S A : \Type} (st : State' S A) : S -> \Sigma S A
   | state' s => s
 
-\instance State'Monad (S : \Type) : Monad (State' S)
+\instance State'Monad (S : \Type) : Monad (\lam A => State' S A)
   | return a => state' (\lam s => (s, a))
   | >>= st f => state' (\lam s => unstate' (f (unstate' st s).2) (unstate' st s).1)
-  | left-identity {A} {B} a f => {?}
-  | right-identity => {?}
-  | associativity => {?}
+  | right-identity m => \case \elim m \with {
+    | state' s => idp
+  }
+  | left-identity a f => h (f a)
+  | associativity m f g => idp
+  \where
+    \func h {S A : \Type} (m : State' S A) : state' (\lam s => unstate' m s) = m \elim m
+      | state' s' => idp
 
 -- 9. Определите \instance Monad для Term.
 
@@ -289,14 +295,25 @@
   : hasType ctx' (b >>= a) B \elim b, B, h
   | var v, _, varType p => transport (\lam x => hasType ctx' (a v) x) p (h' v)
   | app t1 t2, _, appType T2 T1 => appType (substLem ctx t2 (getType T2) T2 ctx' a h') (substLem ctx t1 (getType T1) T1 ctx' a h')
-  | lam t, Arr A B, lamType T => {?} -- lamType (substLem (maybe A ctx) t (getType T) T (maybe A ctx') (TermMonad.maybefy a) (maybe T h'))
+  | lam t, Arr A B, lamType T => {?}
 
 \func substLem1 => {?}
 
 -- 13. Докажите, что если Г |- a : A и Red a a', то Г |- a' : A
 
 \func redLem {V : \Type} {ctx : V -> Type} {a a' : Term V} (r : Red a a') {A : Type} (h : hasType ctx a A)
-  : hasType ctx a' A => {?}
+  : hasType ctx a' A \elim a, a', r, h
+  | _, _, refl a=a', h => transport (\lam x => hasType ctx x A) a=a' h
+  | Term.var v, _, tr _ r1 _, _ => \case r1 \with {}
+  | Term.app t1 t2, Term.var v, tr z r1 r, hasType.appType h1 h2 => {?}
+  | Term.app t t1, Term.unit, tr z r r1, h => {?}
+  | Term.app t t1, Term.app t2 t3, tr z r r1, h => {?}
+  | Term.app t t1, Term.lam t2, tr z r r1, h => {?}
+
+  | Term.lam t1, Term.lam t2, tr z r r1, h => {?}
+  | Term.lam t, Term.var v, tr z r r1, h => {?}
+  | Term.lam t, Term.unit, tr z r r1, h => {?}
+  | Term.lam t, Term.app t1 t2, tr z r r1, h => {?}
 
 -- 14. Закончите доказательство утверждения, что все типизируемые термы достижимы.
 
