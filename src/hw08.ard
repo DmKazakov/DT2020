@@ -13,6 +13,7 @@
 
 \func id' {A : \Type} (a : A) => a
 
+-- здесь нужно указать не неявный аргумент id', а уровень как в функциях test5' и test6 из лекции.
 \func idTest1 : \Pi (A : \Type \lp) -> A -> A => id' (id' {\Pi (A : \Type \lp) -> A -> A} id)
 \func idTest2 : \Type \lp -> \Type \lp => id' {\Type \lp -> \Type \lp} Maybe
 \func idTest3 : \Type (\suc \lp) => id' {\Type (\suc \lp)} Functor
